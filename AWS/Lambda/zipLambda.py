@@ -1,40 +1,49 @@
-#Accept the directory path that will be zipped as an argument
-#Accept the output zip file path and name as an argument
-#Output the the location of the zip file and the directory of what was zipped and whether it was successful or not
 import os
-import zipfile
 import sys
 import shutil
-from pathlib import Path
 import subprocess
+from pathlib import Path
 
-## Accpet arguments ## accpet a zip name in an argument
-sys.argv = ['path/to/file/to/be/zipped/zipLambda.py', 'output\path\where\file\will\go', 'other_dependencies_to_import']
-path_to_lambda = sys.argv[0]
-output_zip_path = sys.argv[1]
-packages = sys.argv[2:]
+def main():
+    # Check arguments
+    if len(sys.argv) < 3:
+        print("Usage: python zipLambda.py <path_to_lambda_dir> <output_zip_path> [packages...]")
+        sys.exit(1)
 
+    path_to_lambda = Path(sys.argv[1])
+    output_zip_path = Path(sys.argv[2])
+    packages = sys.argv[3:]  # optional additional packages
 
-## make directory ##
-# we wipe the directory if it exists already
-tmpdir = Path('lambda_dir') #Stores in cwd
-tmpdir.mkdir(exist_ok=True) 
-if os.path.exists(tmpdir) and os.path.isdir(tmpdir):
-    # Remove it completely
-    shutil.rmtree(tmpdir)
-    print(f"Deleted existing directory: {tmpdir}")
-else:
-    print(f"Directory does not exist: {tmpdir}")
+    # Validate input directory
+    if not path_to_lambda.exists():
+        print(f"Error: Source directory does not exist: {path_to_lambda}")
+        sys.exit(1)
 
+    # Create temporary directory
+    tmpdir = Path("lambda_dir")
 
-## make call to copy files from directory into our new directory ##
+    if tmpdir.exists() and tmpdir.is_dir():
+        shutil.rmtree(tmpdir)
+        print(f"Deleted existing directory: {tmpdir}")
 
-shutil.copytree(sys.argv[0], tmpdir, dirs_exist_ok=True)
-for pkg in packages:
-    subprocess.run([sys.executable, "-m", "pip", "install", pkg, "-t", str(tmpdir)], check=True)
-#make a loop that will go through the rest of the arguments and install them into the tmpdir
+    tmpdir.mkdir(exist_ok=True)
+    print(f"Created fresh directory: {tmpdir}")
 
-## make zip file ##
-shutil.make_archive(tmpdir, 'zip', root_dir=tmpdir)
+    # Copy lambda files into tmpdir
+    shutil.copytree(path_to_lambda, tmpdir, dirs_exist_ok=True)
+    print(f"Copied contents from {path_to_lambda} to {tmpdir}")
 
-## return the location of the zipped file and the name and whether it was successful or not ##
+    # Install any requested packages
+    for pkg in packages:
+        print(f"Installing {pkg}...")
+        subprocess.run([sys.executable, "-m", "pip", "install", pkg, "-t", str(tmpdir)], check=True)
+
+    # Make zip file
+    zip_file = shutil.make_archive(str(output_zip_path), 'zip', root_dir=tmpdir)
+
+    print(f"\n✅ Successfully created zip file: {zip_file}")
+    print(f"📁 Zipped contents from: {path_to_lambda}")
+    print(f"📦 Temporary directory used: {tmpdir}")
+
+if __name__ == "__main__":
+    main()
